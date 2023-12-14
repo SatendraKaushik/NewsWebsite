@@ -1,11 +1,39 @@
 const API_KEY = "da1c0932e298492eae092470c0a2a900";
 const url = "https://newsapi.org/v2/everything?q=";
+const API_KEY_WEATHER = "cc7c736bd37760b389467b5ffd85a0c1";
 
-window.addEventListener("load", () => fetchNews("India"));
-
-function reload() {
-    window.location.reload();
+function getWeatherData(lat, lon) {
+    return fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${API_KEY_WEATHER}&units=metric`);
 }
+
+function displayWeather(data) {
+    const weatherContainer = document.getElementById("weather-container");
+    const weatherContent = `
+        <img src="http://openweathermap.org/img/w/${data.weather[0].icon}.png" alt="Weather Icon">
+        <p>${data.main.temp}°C</p>
+    `;
+
+    weatherContainer.innerHTML = weatherContent;
+}
+
+async function fetchWeather() {
+    if (navigator.geolocation) {
+        try {
+            const position = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject));
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            const weatherData = await getWeatherData(lat, lon);
+            displayWeather(await weatherData.json());
+        } catch (error) {
+            console.error("Error fetching weather:", error);
+        }
+    }
+}
+
+window.addEventListener("load", () => {
+    fetchNews("India");
+    fetchWeather();
+});
 
 async function fetchNews(query) {
     const res = await fetch(`${url}${query}&apiKey=${API_KEY}`);
@@ -67,102 +95,51 @@ searchButton.addEventListener("click", () => {
     curSelectedNav?.classList.remove("active");
     curSelectedNav = null;
 });
-// slider
 
+// Slider
 const searchTerm = "world";
 
-    const slider = document.getElementById("slider");
-    const sliderNav = document.querySelector(".slider-nav");
-
-    let currentSlide = 0;
-
-    async function getNews() {
-      try {
+async function getNewsData() {
+    try {
         const response = await fetch(`${url}${searchTerm}&apiKey=${API_KEY}`);
         const data = await response.json();
         return data.articles;
-      } catch (error) {
+    } catch (error) {
         console.error("Error fetching news:", error);
-      }
     }
+}
 
-    function showSlides() {
-      getNews().then(news => {
-        slider.innerHTML = "";
+async function displaySlides() {
+    const slider = document.getElementById("slider");
+    const newsData = await getNewsData();
 
-        news.forEach((article, index) => {
-          const slide = document.createElement("div");
-          slide.classList.add("slide");
+    slider.innerHTML = "";
 
-          const content = `
+    newsData.forEach((article, index) => {
+        const slide = document.createElement("div");
+        slide.classList.add("slide");
+
+        const content = `
             <div class="slide-content">
-              <h3>${article.title}</h3>
-              <p>${article.description}</p>
-              <a href="${article.url}" target="_blank">Read more</a>
+                <h3>${article.title}</h3>
+                <p>${article.description}</p>
+                <a href="${article.url}" target="_blank">Read more</a>
             </div>
             <img src="${article.urlToImage}" alt="${article.title}">
-          `;
-
-          slide.innerHTML = content;
-          slider.appendChild(slide);
-        });
-
-        // Auto-scroll the slider
-        setInterval(() => {
-          nextSlide();
-        }, 5000);
-      });
-    }
-
-    function nextSlide() {
-      currentSlide = (currentSlide + 1) % slider.children.length;
-      updateSlider();
-    }
-
-    function prevSlide() {
-      currentSlide = (currentSlide - 1 + slider.children.length) % slider.children.length;
-      updateSlider();
-    }
-
-    function updateSlider() {
-      slider.style.transition = "transform 0.5s ease-in-out";
-      slider.style.transform = `translateX(-${currentSlide * 100}%)`;
-    }
-
-    // Initial render
-    showSlides();
-    const API_KEY_WEATHER = "cc7c736bd37760b389467b5ffd85a0c1";
-
-async function getWeather(lat, lon) {
-  try {
-    const response = await fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${API_KEY_WEATHER}&units=metric`);
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error("Error fetching weather:", error);
-  }
-}
-
-async function showWeather() {
-  const weatherContainer = document.getElementById("weather-container");
-
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(async (position) => {
-      const lat = position.coords.latitude;
-      const lon = position.coords.longitude;
-      const weatherData = await getWeather(lat, lon);
-
-      if (weatherData) {
-        const weatherContent = `
-          <img src="http://openweathermap.org/img/w/${weatherData.weather[0].icon}.png" alt="Weather Icon">
-          <p>${weatherData.main.temp}°C</p>
         `;
 
-        weatherContainer.innerHTML = weatherContent;
-      }
+        slide.innerHTML = content;
+        slider.appendChild(slide);
     });
-  }
+
+    let currentSlide = 0;
+
+    // Auto-scroll the slider
+    setInterval(() => {
+        currentSlide = (currentSlide + 1) % slider.children.length;
+        slider.style.transition = "transform 0.5s ease-in-out";
+        slider.style.transform = `translateX(-${currentSlide * 100}%)`;
+    }, 5000);
 }
 
-// Initial render
-showWeather();
+displaySlides();
