@@ -2,67 +2,213 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="Newpaper.html">
-    <title>MOJ</title>
-    <link rel="stylesheet" href="style.css">
-    <!-- <link rel="stylesheet" href="slider.css"> -->
+    <title>Camera and Bing Maps Demo</title>
+    <style>
+        #map-container {
+            width: 100%;
+            height: 300px;
+            margin-top: 20px;
+        }
+
+        #descriptionInput {
+            margin-top: 10px;
+        }
+
+        #cameraPreview {
+            width: 100%;
+            max-width: 640px;
+        }
+
+        #image-container, #location-container {
+            margin: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: center;
+        }
+
+        #selected-image {
+            max-width: 100%;
+            max-height: 400px;
+        }
+    </style>
+    <script src="https://cdn.emailjs.com/dist/email.min.js"></script>
+    <script type="text/javascript">
+        emailjs.init("user_your_emailjs_user_id"); // Replace with your Email.js user ID
+
+        // Define position and state in the global scope
+        let position;
+        let state;
+
+        // Additional variable to track whether the camera is open
+        let isCameraOpen = false;
+
+        // Separate capture function to keep camera screen open
+        function capturePhoto() {
+            if (isCameraOpen) {
+                captureImage();
+            } else {
+                openFrontCamera();
+            }
+        }
+    </script>
 </head>
 <body>
+    <h1>Camera and Bing Maps Demo</h1>
 
-    <nav>
-        <div class="main-nav container flex">
-            <a href="#" onclick="reload()" class="company-logo">
-                <img src="Untitled.png" style="border-radius: 5px; margin-top: 4px;" alt="company logo">
-            </a>
-            <div class="nav-links">
-                <ul class="flex">
-                    <li class="hover-link nav-item" id="ipl" onclick="onNavItemClick('ipl')">IPL</li>
-                    <li class="hover-link nav-item" id="finance" onclick="onNavItemClick('finance')">Finance</li>
-                    <li class="hover-link nav-item" id="politics" onclick="onNavItemClick('politics')">Politics</li>
-                    <li class="hover-link nav-item" id="movie" onclick="onNavItemClick('movie')">Movie</li>
-                    <li class="hover-link nav-item" ><a href="Newpaper.html ">NewsPaper</a></li>
-                </ul>
-            </div>
-            <div class="search-bar flex">
-                <input id="search-text" type="text" class="news-input" placeholder="e.g. Science">
-                <button id="search-button" class="search-button" >Search</button>
-            </div>
-            <div>   <div class="weather-container" id="weather-container"></div></div>
-        </div>
-    </nav>
-    
- <!-- Slider -->
-    <div class="lol">
-     
-        <div class="slider-container">
-            <div id="slider" class="slider"></div>
-            <div class="slider-nav">
-              <button onclick="prevSlide()">Previous</button>
-              <button onclick="nextSlide()">Next</button>
-            </div>
+    <!-- Image container -->
+    <div id="image-container">
+        <video id="cameraPreview" style="display: none;"></video>
+        <button onclick="capturePhoto()">Capture Photo</button>
+        <canvas id="captured-image" style="display: none;"></canvas>
+        <img id="selected-image" style="display: none;" alt="Captured Image">
+        <input type="text" id="descriptionInput" placeholder="Enter Description">
+        <button onclick="shareImage()">Share Photo via Email</button>
     </div>
-    <main>
-        <div class="cards-container container flex" id="cards-container">
-            
-        </div>
-    </main>
 
-    <template id="template-news-card">
-        <div class="card">
-            <div class="card-header">
-                <img src="https://via.placeholder.com/400x200" alt="news-image" id="news-img">
-            </div>
-            <div class="card-content">
-                <h3 id="news-title">This is the Title</h3>
-                <h6 class="news-source" id="news-source">End Gadget 26/08/2023</h6>
-                <p class="news-desc" id="news-desc">Lorem, ipsum dolor sit amet consectetur adipisicing elit. Recusandae saepe quis voluptatum quisquam vitae doloremque facilis molestias quae ratione cumque!</p>
-            </div>
-        </div>
-    </template>
+    <!-- Location container -->
+    <div id="location-container">
+        <p id="location-text"></p>
+    </div>
 
-    <script src="Script.js"></script>
-    <!-- <script src="slider.js"></script> -->
+    <!-- Map container -->
+    <div id="map-container"></div>
+
+    <script>
+        let map;
+        let videoStream;
+        let imageCapture;
+
+        function initMap() {
+            map = new Microsoft.Maps.Map(document.getElementById('map-container'), {
+                credentials: 'ArSGwElpgs65UXUwCnZ4ibhLzkmxuScTxz0rCq_kgJy35pa2tSq229GIMzMPVQ8P',
+                center: new Microsoft.Maps.Location(0, 0),
+                zoom: 2
+            });
+        }
+
+        function openFrontCamera() {
+            navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'user' }
+            })
+            .then(function(stream) {
+                videoStream = stream;
+                const cameraPreview = document.getElementById('cameraPreview');
+                cameraPreview.style.display = 'block';
+                cameraPreview.srcObject = stream;
+                imageCapture = new ImageCapture(stream.getVideoTracks()[0]);
+                isCameraOpen = true;
+            })
+            .catch(function(error) {
+                console.error('Error accessing camera:', error);
+            });
+        }
+
+        function closeCamera() {
+            if (videoStream) {
+                videoStream.getTracks().forEach(track => track.stop());
+                videoStream = null;
+                const cameraPreview = document.getElementById('cameraPreview');
+                cameraPreview.style.display = 'none';
+                isCameraOpen = false;
+            }
+        }
+
+        function captureImage() {
+            imageCapture.takePhoto()
+            .then(blob => {
+                const url = URL.createObjectURL(blob);
+
+                // Display the captured image
+                displayCapturedImage(url);
+
+                // Stop the camera stream
+                closeCamera();
+
+                // Fetch location using device's geolocation
+                getLocation();
+            })
+            .catch(error => console.error('Error capturing image:', error));
+        }
+
+        function displayCapturedImage(url) {
+            const capturedImage = document.getElementById('selected-image');
+            capturedImage.style.display = 'block';
+            capturedImage.src = url;
+        }
+
+        function getLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                pos => {
+                    const coordinates = [pos.coords.latitude, pos.coords.longitude];
+
+                    // Fetch additional location details using OpenCage Geocoding API
+                    fetchLocationDetails(coordinates, () => {
+                        // Display the map (this will be called after location details are fetched)
+                        displayMap(coordinates);
+
+                        // Stop the camera stream
+                        closeCamera();
+                    });
+                },
+                error => console.error('Error getting location:', error)
+                );
+            } else {
+                console.error('Geolocation is not supported by this browser.');
+            }
+        }
+
+        function fetchLocationDetails(coordinates, callback) {
+            // Replace 'YOUR_OPENCAGE_API_KEY' with your actual OpenCage API key
+            const apiKey = 'dbf5cac2f04c479c8c514f6567eedef3';
+            const apiUrl = `https://api.opencagedata.com/geocode/v1/json?q=${coordinates[0]}+${coordinates[1]}&key=${apiKey}`;
+
+            fetch(apiUrl)
+                .then(response => response.json())
+                .then(data => {
+                    const locationDetails = data.results[0].components;
+                    state = locationDetails.state; // Update global state variable
+                    const country = locationDetails.country;
+                    const city = locationDetails.city;
+
+                    // Display location text with additional details
+                    const locationText = document.getElementById('location-text');
+                    locationText.textContent = `Location: (${coordinates[0]}, ${coordinates[1]}) - ${city}, ${state}, ${country}`;
+
+                    // Continue with the email sending callback
+                    callback(coordinates);
+                })
+                .catch(error => console.error('Error fetching location details:', error));
+        }
+
+        function displayMap(coordinates) {
+            const mapContainer = document.getElementById('map-container');
+            const mapUrl = `https://www.bing.com/maps/embed/viewer.aspx?v=3&cp=${coordinates[0]}~${coordinates[1]}&lvl=15&sty=r&typ=d&pp=`;
+
+            // mapContainer.innerHTML = `<iframe width="100%" height="100%" frameborder="0" scrolling="no" marginheight="0" marginwidth="0" src="${mapUrl}"></iframe>`;
+        }
+
+        function shareImage() {
+            const capturedImage = document.getElementById('selected-image');
+            const locationText = document.getElementById('location-text');
+            const descriptionInput = document.getElementById('descriptionInput');
+
+            const imageSrc = capturedImage.src;
+            const location = locationText.textContent;
+            const description = descriptionInput.value;
+
+            // Construct the mailto link
+            const subject = encodeURIComponent('Photo Sharing');
+            const body = encodeURIComponent(`Image: ${imageSrc}\nDescription: ${description}\nLocation: ${location}\nPosition: ${position}\nState: ${state}`);
+            const mailtoLink = `mailto:?subject=${subject}&body=${body}`;
+
+            // Open the default email client
+            window.location.href = mailtoLink;
+        }
+
+        window.addEventListener('unload', closeCamera);
+    </script>
+    <script type="text/javascript" src="https://www.bing.com/api/maps/mapcontrol?key=YOUR_BING_MAPS_API_KEY&callback=initMap" async defer></script>
 </body>
-</html> 
+</html>
